@@ -1,13 +1,18 @@
 package net.runelite.client.plugins.aiassistant;
 
-import net.runelite.client.RuneLite;
-import net.runelite.client.externalplugins.ExternalPluginManager;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.mockito.junit.MockitoJUnitRunner;
 
+import static org.junit.Assert.assertNotNull;
+
+@RunWith(MockitoJUnitRunner.class)
 public class AiAssistantPluginTest
 {
-	public static void main(String[] args) throws Exception
+	@Test
+	public void testPluginInstantiation()
 	{
-		ExternalPluginManager.loadBuiltin(AiAssistantPlugin.class);
-		RuneLite.main(args);
+		AiAssistantPlugin plugin = new AiAssistantPlugin();
+		assertNotNull("Plugin should be instantiable", plugin);
 	}
 }
