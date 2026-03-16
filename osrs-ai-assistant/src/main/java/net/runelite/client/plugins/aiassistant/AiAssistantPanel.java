@@ -20,6 +20,7 @@ public class AiAssistantPanel extends PluginPanel
 	private final JTextField messageInput;
 	private final JButton sendButton;
 	private final JButton snapshotButton;
+	private final JButton clearHistoryButton;
 	private final AiAssistantPlugin plugin;
 
 	public AiAssistantPanel(AiAssistantPlugin plugin)
@@ -64,7 +65,7 @@ public class AiAssistantPanel extends PluginPanel
 		inputPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
 		inputPanel.setBorder(new EmptyBorder(5, 5, 5, 5));
 
-		// Button panel (for snapshot button)
+		// Button panel (for snapshot and clear history buttons)
 		JPanel buttonPanel = new JPanel();
 		buttonPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 5, 0));
 		buttonPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -73,6 +74,16 @@ public class AiAssistantPanel extends PluginPanel
 		snapshotButton.setToolTipText("Save current player state");
 		snapshotButton.addActionListener(e -> plugin.saveSnapshot());
 		buttonPanel.add(snapshotButton);
+
+		clearHistoryButton = new JButton("Clear History");
+		clearHistoryButton.setToolTipText("Clear conversation history");
+		clearHistoryButton.addActionListener(e ->
+		{
+			plugin.clearConversationHistory();
+			clearChat();
+			addSystemMessage("Conversation history cleared!");
+		});
+		buttonPanel.add(clearHistoryButton);
 
 		inputPanel.add(buttonPanel, BorderLayout.NORTH);
 
@@ -156,6 +167,41 @@ public class AiAssistantPanel extends PluginPanel
 	public void addAiMessage(String message)
 	{
 		appendMessage("AI", message, ColorScheme.PROGRESS_COMPLETE_COLOR);
+		setInputEnabled(true);
+	}
+
+	/**
+	 * Starts a streaming AI message.
+	 */
+	public void startStreamingAiMessage()
+	{
+		SwingUtilities.invokeLater(() ->
+		{
+			if (chatHistory.getText().length() > 0)
+			{
+				chatHistory.append("\n\n");
+			}
+			chatHistory.append("[AI]: ");
+		});
+	}
+
+	/**
+	 * Appends a chunk to the current streaming message.
+	 */
+	public void appendStreamingChunk(String chunk)
+	{
+		SwingUtilities.invokeLater(() ->
+		{
+			chatHistory.append(chunk);
+			chatHistory.setCaretPosition(chatHistory.getDocument().getLength());
+		});
+	}
+
+	/**
+	 * Finishes a streaming AI message.
+	 */
+	public void finishStreamingAiMessage()
+	{
 		setInputEnabled(true);
 	}
 

@@ -195,7 +195,6 @@ public class PlayerDataCollector
 
 	/**
 	 * Gets a human-readable location name from coordinates.
-	 * This is a simplified implementation - a full version would use region names.
 	 */
 	private String getLocationName(WorldPoint point)
 	{
@@ -203,26 +202,131 @@ public class PlayerDataCollector
 		int y = point.getY();
 		int plane = point.getPlane();
 
-		// Very basic location detection - could be enhanced with proper region mapping
-		if (x >= 3200 && x <= 3230 && y >= 3200 && y <= 3230)
+		// Major cities
+		if (x >= 3200 && x <= 3230 && y >= 3200 && y <= 3235)
 		{
 			return "Lumbridge";
 		}
-		else if (x >= 3080 && x <= 3120 && y >= 3440 && y <= 3480)
+		else if (x >= 3075 && x <= 3120 && y >= 3440 && y <= 3500)
 		{
 			return "Edgeville";
 		}
-		else if (x >= 3000 && x <= 3100 && y >= 3370 && y <= 3400)
+		else if (x >= 3200 && x <= 3290 && y >= 3370 && y <= 3430)
 		{
 			return "Varrock";
 		}
-		else if (x >= 2940 && x <= 2980 && y >= 3360 && y <= 3400)
+		else if (x >= 2940 && x <= 2985 && y >= 3310 && y <= 3400)
 		{
 			return "Falador";
 		}
-		else if (x >= 3230 && x <= 3260 && y >= 3410 && y <= 3450)
+		else if (x >= 3000 && x <= 3100 && y >= 3200 && y <= 3260)
+		{
+			return "Draynor Village";
+		}
+		else if (x >= 2600 && x <= 2690 && y >= 3270 && y <= 3320)
+		{
+			return "Ardougne";
+		}
+		else if (x >= 2440 && x <= 2490 && y >= 3400 && y <= 3450)
+		{
+			return "Yanille";
+		}
+		else if (x >= 2500 && x <= 2560 && y >= 2850 && y <= 2900)
+		{
+			return "Shilo Village";
+		}
+		else if (x >= 2800 && x <= 2880 && y >= 2700 && y <= 2800)
+		{
+			return "Karamja";
+		}
+		else if (x >= 1600 && x <= 1680 && y >= 3800 && y <= 3900)
+		{
+			return "Zeah (Great Kourend)";
+		}
+
+		// Grand Exchange
+		else if (x >= 3140 && x <= 3190 && y >= 3460 && y <= 3510)
 		{
 			return "Grand Exchange";
+		}
+
+		// Popular banks
+		else if (x >= 3090 && x <= 3100 && y >= 3240 && y <= 3250)
+		{
+			return "Draynor Bank";
+		}
+		else if (x >= 2943 && x <= 2950 && y >= 3365 && y <= 3372)
+		{
+			return "Falador Bank";
+		}
+
+		// Training areas
+		else if (x >= 3240 && x <= 3280 && y >= 3140 && y <= 3180)
+		{
+			return "Al Kharid";
+		}
+		else if (x >= 2640 && x <= 2690 && y >= 3670 && y <= 3720)
+		{
+			return "Seers' Village";
+		}
+		else if (x >= 2700 && x <= 2730 && y >= 3700 && y <= 3730)
+		{
+			return "Camelot";
+		}
+
+		// Wilderness
+		else if (y >= 3520 && y <= 4000)
+		{
+			int wildyLevel = (y - 3520) / 8;
+			return String.format("Wilderness (Level %d)", wildyLevel);
+		}
+
+		// Popular dungeons and areas
+		else if (x >= 2438 && x <= 2462 && y >= 5126 && y <= 5166)
+		{
+			return "Motherlode Mine";
+		}
+		else if (x >= 3140 && x <= 3260 && y >= 9850 && y <= 9920)
+		{
+			return "Mining Guild";
+		}
+		else if (x >= 3000 && x <= 3050 && y >= 9700 && y <= 9800)
+		{
+			return "Lumbridge Swamp Caves";
+		}
+		else if (x >= 2100 && x <= 2200 && y >= 5200 && y <= 5350)
+		{
+			return "Wintertodt Arena";
+		}
+
+		// Slayer areas
+		else if (x >= 2396 && x <= 2432 && y >= 3050 && y <= 3090)
+		{
+			return "Brimhaven Dungeon";
+		}
+		else if (x >= 2425 && x <= 2475 && y >= 9795 && y <= 9855)
+		{
+			return "Catacombs of Kourend";
+		}
+
+		// Bosses
+		else if (x >= 2998 && x <= 3006 && y >= 3376 && y <= 3384)
+		{
+			return "King Black Dragon Lair";
+		}
+		else if (x >= 3038 && x <= 3072 && y >= 9564 && y <= 9600)
+		{
+			return "God Wars Dungeon";
+		}
+
+		// Minigames
+		else if (x >= 3550 && x <= 3580 && y >= 3280 && y <= 3310)
+		{
+			return "Barrows";
+		}
+		else if (x >= 2435 && x <= 2475 && y >= 3080 && y <= 3110)
+		{
+			return "Fight Caves";
 		}
 
 		return String.format("Coordinates(%d, %d, %d)", x, y, plane);

@@ -72,6 +72,30 @@ public interface AiAssistantConfig extends Config
 		return AnthropicModel.CLAUDE_SONNET;
 	}
 
+	@ConfigItem(
+		keyName = "customSystemPrompt",
+		name = "Custom System Prompt",
+		description = "Customize the AI's behavior (leave empty for default OSRS assistant prompt)",
+		position = 4,
+		section = aiProviderSection
+	)
+	default String customSystemPrompt()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = "enableStreaming",
+		name = "Enable Streaming",
+		description = "Stream AI responses as they are generated (faster perceived response time)",
+		position = 5,
+		section = aiProviderSection
+	)
+	default boolean enableStreaming()
+	{
+		return true;
+	}
+
 	// Snapshot Settings
 	@ConfigItem(
 		keyName = "autoSnapshot",

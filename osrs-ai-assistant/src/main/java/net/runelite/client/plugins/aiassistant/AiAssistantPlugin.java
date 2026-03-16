@@ -11,8 +11,10 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.aiassistant.ai.AiProvider;
 import net.runelite.client.plugins.aiassistant.ai.AnthropicProvider;
+import net.runelite.client.plugins.aiassistant.ai.ConversationHistory;
 import net.runelite.client.plugins.aiassistant.ai.OpenAiProvider;
 import net.runelite.client.plugins.aiassistant.ai.PromptBuilder;
+import net.runelite.client.plugins.aiassistant.ai.UsageTracker;
 import net.runelite.client.plugins.aiassistant.data.PlayerDataCollector;
 import net.runelite.client.plugins.aiassistant.data.PlayerSnapshot;
 import net.runelite.client.plugins.aiassistant.data.SnapshotManager;
@@ -58,11 +60,17 @@ public class AiAssistantPlugin extends Plugin
 	private NavigationButton navButton;
 	private AiProvider currentProvider;
 	private ScheduledFuture<?> snapshotTask;
+	private ConversationHistory conversationHistory;
+	private UsageTracker usageTracker;
 
 	@Override
 	protected void startUp() throws Exception
 	{
 		log.info("AI Assistant started!");
+
+		// Initialize conversation history and usage tracker
+		conversationHistory = new ConversationHistory();
+		usageTracker = new UsageTracker();
 
 		// Create UI panel
 		panel = new AiAssistantPanel(this);
@@ -143,16 +151,85 @@ public class AiAssistantPlugin extends Plugin
 					return;
 				}
 
+				// Check rate limit (max 10 calls per minute)
+				if (usageTracker.isRateLimitExceeded(10))
+				{
+					onError.accept("Rate limit exceeded. Please wait a moment before sending another message.");
+					return;
+				}
+
 				// Collect current player data
 				PlayerSnapshot snapshot = dataCollector.collectSnapshot();
 				String context = snapshot != null ? PromptBuilder.buildContext(snapshot) : "No player data available.";
 
-				// Send message to AI
-				log.debug("Sending message to AI: {}", message);
-				String response = currentProvider.sendMessage(message, context);
+				// Add user message to history
+				conversationHistory.addUserMessage(message);
 
-				// Return response
-				onSuccess.accept(response);
+				// Send message to AI with history and custom system prompt
+				log.debug("Sending message to AI: {}", message);
+				String response;
+				String customPrompt = config.customSystemPrompt();
+				boolean useStreaming = config.enableStreaming() && currentProvider.supportsStreaming();
+
+				// Use streaming if enabled and supported
+				if (useStreaming)
+				{
+					// Start streaming display
+					if (panel != null)
+					{
+						panel.startStreamingAiMessage();
+					}
+
+					// Send with streaming
+					response = currentProvider.sendMessageWithStreaming(
+						message,
+						context,
+						conversationHistory,
+						customPrompt,
+						chunk -> {
+							// Display each chunk as it arrives
+							if (panel != null)
+							{
+								panel.appendStreamingChunk(chunk);
+							}
+						}
+					);
+
+					// Finish streaming display
+					if (panel != null)
+					{
+						panel.finishStreamingAiMessage();
+					}
+				}
+				else
+				{
+					// Non-streaming fallback
+					if (currentProvider instanceof OpenAiProvider)
+					{
+						response = ((OpenAiProvider) currentProvider).sendMessageWithHistory(message, context, conversationHistory, customPrompt);
+					}
+					else if (currentProvider instanceof AnthropicProvider)
+					{
+						response = ((AnthropicProvider) currentProvider).sendMessageWithHistory(message, context, conversationHistory, customPrompt);
+					}
+					else
+					{
+						response = currentProvider.sendMessageWithHistory(message, context, conversationHistory);
+					}
+
+					// Display complete response
+					onSuccess.accept(response);
+				}
+
+				// Add AI response to history
+				conversationHistory.addAssistantMessage(response);
+
+				// Track API usage (estimate ~500 tokens per call)
+				usageTracker.recordCall(500);
+
+				// Log usage stats
+				UsageTracker.UsageStats stats = usageTracker.getStats();
+				log.debug("Usage stats: {}", stats);
 			}
 			catch (Exception e)
 			{
@@ -160,6 +237,37 @@ public class AiAssistantPlugin extends Plugin
 				onError.accept("Error: " + e.getMessage());
 			}
 		});
+	}
+
+	/**
+	 * Clears the conversation history.
+	 */
+	public void clearConversationHistory()
+	{
+		if (conversationHistory != null)
+		{
+			conversationHistory.clear();
+			log.debug("Conversation history cleared");
+		}
+	}
+
+	/**
+	 * Gets current usage statistics.
+	 */
+	public UsageTracker.UsageStats getUsageStats()
+	{
+		return usageTracker != null ? usageTracker.getStats() : null;
+	}
+
+	/**
+	 * Resets usage statistics.
+	 */
+	public void resetUsageStats()
+	{
+		if (usageTracker != null)
+		{
+			usageTracker.reset();
+		}
 	}
 
 	/**

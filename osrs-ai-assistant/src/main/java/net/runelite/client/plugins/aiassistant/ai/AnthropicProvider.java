@@ -6,8 +6,11 @@ import com.google.gson.JsonObject;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /**
  * Anthropic (Claude) API provider implementation.
@@ -39,27 +42,94 @@ public class AnthropicProvider implements AiProvider
 	@Override
 	public String sendMessage(String message, String context) throws Exception
 	{
-		// Build the request body
-		JsonObject requestBody = new JsonObject();
-		requestBody.addProperty("model", model);
-		requestBody.addProperty("max_tokens", 1024);
+		// Delegate to the new method with empty history
+		return sendMessageWithHistory(message, context, new ConversationHistory(0));
+	}
 
-		// Add system message with context
-		if (context != null && !context.isEmpty())
+	@Override
+	public String sendMessageWithHistory(String message, String context, ConversationHistory history) throws Exception
+	{
+		return sendMessageWithHistory(message, context, history, null);
+	}
+
+	@Override
+	public boolean supportsStreaming()
+	{
+		return true;
+	}
+
+	@Override
+	public String sendMessageWithStreaming(String message, String context, ConversationHistory history,
+										   String customSystemPrompt, Consumer<String> onChunk) throws Exception
+	{
+		// Build the request body
+		JsonObject requestBody = buildRequestBody(message, context, history, customSystemPrompt, true);
+
+		// Build the HTTP request
+		RequestBody body = RequestBody.create(gson.toJson(requestBody), JSON);
+		Request request = new Request.Builder()
+			.url(API_URL)
+			.post(body)
+			.addHeader("x-api-key", apiKey)
+			.addHeader("anthropic-version", API_VERSION)
+			.addHeader("content-type", "application/json")
+			.build();
+
+		// Execute the streaming request
+		StringBuilder fullResponse = new StringBuilder();
+		try (Response response = httpClient.newCall(request).execute())
 		{
-			String systemPrompt = "You are a helpful OSRS (Old School RuneScape) assistant. " +
-				"Use the following player information to provide personalized assistance:\n\n" + context;
-			requestBody.addProperty("system", systemPrompt);
+			if (!response.isSuccessful())
+			{
+				String errorBody = response.body() != null ? response.body().string() : "Unknown error";
+				log.error("Anthropic API error: {} - {}", response.code(), errorBody);
+				throw new IOException("Anthropic API request failed: " + response.code());
+			}
+
+			// Read streaming response
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.body().byteStream())))
+			{
+				String line;
+				while ((line = reader.readLine()) != null)
+				{
+					if (line.startsWith("data: "))
+					{
+						String data = line.substring(6);
+						try
+						{
+							JsonObject chunk = gson.fromJson(data, JsonObject.class);
+							String type = chunk.has("type") ? chunk.get("type").getAsString() : "";
+
+							if ("content_block_delta".equals(type))
+							{
+								JsonObject delta = chunk.getAsJsonObject("delta");
+								if (delta != null && delta.has("text"))
+								{
+									String text = delta.get("text").getAsString();
+									fullResponse.append(text);
+									if (onChunk != null)
+									{
+										onChunk.accept(text);
+									}
+								}
+							}
+						}
+						catch (Exception e)
+						{
+							log.warn("Failed to parse streaming chunk: {}", data, e);
+						}
+					}
+				}
+			}
 		}
 
-		// Add user message
-		JsonArray messages = new JsonArray();
-		JsonObject userMessage = new JsonObject();
-		userMessage.addProperty("role", "user");
-		userMessage.addProperty("content", message);
-		messages.add(userMessage);
+		return fullResponse.toString();
+	}
 
-		requestBody.add("messages", messages);
+	public String sendMessageWithHistory(String message, String context, ConversationHistory history, String customSystemPrompt) throws Exception
+	{
+		// Build the request body
+		JsonObject requestBody = buildRequestBody(message, context, history, customSystemPrompt, false);
 
 		// Build the HTTP request
 		RequestBody body = RequestBody.create(gson.toJson(requestBody), JSON);
@@ -110,5 +180,74 @@ public class AnthropicProvider implements AiProvider
 	{
 		// Anthropic API keys start with "sk-ant-"
 		return apiKey != null && apiKey.startsWith("sk-ant-") && apiKey.length() > 20;
+	}
+
+	/**
+	 * Builds the request body for the API request.
+	 */
+	private JsonObject buildRequestBody(String message, String context, ConversationHistory history,
+										String customSystemPrompt, boolean streaming)
+	{
+		JsonObject requestBody = new JsonObject();
+		requestBody.addProperty("model", model);
+		requestBody.addProperty("max_tokens", 1024);
+
+		if (streaming)
+		{
+			requestBody.addProperty("stream", true);
+		}
+
+		// Add system message with context
+		if (context != null && !context.isEmpty())
+		{
+			String systemPrompt;
+			if (customSystemPrompt != null && !customSystemPrompt.trim().isEmpty())
+			{
+				// Use custom system prompt
+				systemPrompt = customSystemPrompt + "\n\nPlayer information:\n\n" + context;
+			}
+			else
+			{
+				// Use default system prompt
+				systemPrompt = "You are a helpful OSRS (Old School RuneScape) assistant. " +
+					"Use the following player information to provide personalized assistance:\n\n" + context;
+			}
+			requestBody.addProperty("system", systemPrompt);
+		}
+
+		requestBody.add("messages", buildMessagesArray(message, history));
+		return requestBody;
+	}
+
+	/**
+	 * Builds the messages array for the API request.
+	 */
+	private JsonArray buildMessagesArray(String message, ConversationHistory history)
+	{
+		JsonArray messages = new JsonArray();
+
+		// Add conversation history
+		if (history != null)
+		{
+			for (ConversationHistory.Message historyMessage : history.getMessages())
+			{
+				// Skip system messages in history (system is separate in Anthropic API)
+				if (!"system".equals(historyMessage.getRole()))
+				{
+					JsonObject msg = new JsonObject();
+					msg.addProperty("role", historyMessage.getRole());
+					msg.addProperty("content", historyMessage.getContent());
+					messages.add(msg);
+				}
+			}
+		}
+
+		// Add current user message
+		JsonObject userMessage = new JsonObject();
+		userMessage.addProperty("role", "user");
+		userMessage.addProperty("content", message);
+		messages.add(userMessage);
+
+		return messages;
 	}
 }
