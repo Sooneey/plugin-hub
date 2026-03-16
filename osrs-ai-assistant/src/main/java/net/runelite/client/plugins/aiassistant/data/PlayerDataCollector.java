@@ -65,7 +65,7 @@ public class PlayerDataCollector
 		{
 			String skillName = skill.getName();
 			skillLevels.put(skillName, client.getRealSkillLevel(skill));
-			skillExperience.put(skillName, client.getSkillExperience(skill));
+			skillExperience.put(skillName, (long) client.getSkillExperience(skill));
 		}
 		builder.skillLevels(skillLevels);
 		builder.skillExperience(skillExperience);
